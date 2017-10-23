@@ -1,0 +1,54 @@
+#!/bin/bash
+
+default_data_dir=./data/man-eng
+output_dir=./intermediate
+word_vecs_dir=./data/word_vecs
+
+rm -fr $output_dir
+mkdir -p $output_dir
+
+train_src=$(realpath ${1:-${default_data_dir}/corpus.train.man})
+train_tgt=$(realpath ${2:-${default_data_dir}/corpus.train.pp})
+valid_src=$(realpath ${3:-${default_data_dir}/corpus.dev.man})
+valid_tgt=$(realpath ${4:-${default_data_dir}/corpus.dev.pp})
+save_data=$(realpath ${5:-${output_dir}/data})
+# pre_word_vecs_enc=$(realpath ${6:-${word_vecs_dir}/man.txt})
+pre_word_vecs_dec=$(realpath ${7:-${word_vecs_dir}/eng.txt})
+
+save_model=$(realpath ${8:-${output_dir}/model})
+
+test_src=$(realpath ${9:-${default_data_dir}/corpus.test.man})
+test_tgt=$(realpath ${10:-${default_data_dir}/corpus.test.pp})
+output=$(realpath ${11:-${output_dir}/pred.txt})
+
+epochs=${12:-10}
+
+bleu=./tools/multi-bleu.perl
+
+preproc=./preprocess.py
+train=./train.py
+decode=./inference.py
+
+
+printf "Preprocessing..`date`\n"
+python -u $preproc -train_src=${train_src} \
+    -train_tgt=${train_tgt} -valid_src=${valid_src} \
+    -valid_tgt=${valid_tgt} -save_data=${save_data} \
+    -test_src=${test_src} -test_tgt=${test_tgt} \
+    -pre_word_vecs_dec=${pre_word_vecs_dec} || exit
+  # -pre_word_vecs_enc=${pre_word_vecs_enc} \
+
+printf "Training...`date`\n"
+python -u $train -data=${save_data}-train.pt \
+    -save_model=${save_model} \
+    -pre_word_vecs_dec=${save_data}.word_vecs.dec \
+    -gpus 0 -epochs $epochs || exit
+    # -pre_word_vecs_enc=${save_data}.word_vecs.enc \
+
+printf "\n\nDecoding epochs ${epochs}...`date`\n"
+python -u $decode -model=`ls ${save_model}_e${epochs}*.pt` \
+    -src=${test_src} -tgt=${test_tgt} -output=$output \
+    -gpu 0 -beam_size 1 || exit
+
+$bleu ${test_tgt} < $output || exit
+printf "Done!\n\n"

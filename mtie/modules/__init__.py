@@ -1,0 +1,1 @@
+from mtie.modules.GlobalAttention import GlobalAttention, DoubleGlobalAttention
