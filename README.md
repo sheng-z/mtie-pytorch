@@ -7,6 +7,8 @@ Python 2.7
 
 Cuda 8.0
 
+[PredPatt](https://github.com/hltcoe/PredPatt)
+
 ## Demo
 To run the `demo`,
 
